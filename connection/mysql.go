@@ -6,7 +6,7 @@ import (
 )
 
 func ConnectDb() (*sqlx.DB, error) {
-	db, err := sqlx.Connect("mysql", "root:truong652000@tcp(localhost:3306)/scamreport")
+	db, err := sqlx.Connect("mysql", "root:truong652000@tcp(localhost:3306)/hugmanh")
 	if err != nil {
 		return nil, err
 	}

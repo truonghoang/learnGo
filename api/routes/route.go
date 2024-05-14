@@ -2,7 +2,7 @@ package routes
 
 import (
 	"truonghoang/go-scam/api/handles"
-	"truonghoang/go-scam/api/middleware"
+	// "truonghoang/go-scam/api/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,10 +21,11 @@ func RouteAccount(route *gin.RouterGroup) {
 }
 
 func RouteUserScam(route *gin.RouterGroup) {
-	routeUserScam := route.Group("/report").Use(middleware.MiddleWare())
+	routeUserScam := route.Group("/report")
+	// .Use(middleware.MiddleWare())
 	{
 		routeUserScam.GET("/", func(ctx *gin.Context) {
-            
+            handles.ListUserScam(ctx)
 		})
 
 		routeUserScam.DELETE("/", func(ctx *gin.Context) {

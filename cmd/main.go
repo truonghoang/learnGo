@@ -7,7 +7,7 @@ import (
 	"truonghoang/go-scam/api/routes"
 )
 
-const port = "localhost:80"
+const port = "localhost:8080"
 
 func main() {
 

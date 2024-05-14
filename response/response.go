@@ -44,10 +44,10 @@ func Res401(ctx *gin.Context) {
 
 func Res200(ctx *gin.Context, message string, data interface{}) {
 	ctx.JSON(http.StatusOK, gin.H{
-		"code":    1,
-		"status":  http.StatusOK,
-		"message": message ,
-		"data":    data,
+		"code":     1,
+		"status":   http.StatusOK,
+		"message":  message,
+		"response": data,
 	})
 
 }

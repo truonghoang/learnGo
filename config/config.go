@@ -12,6 +12,7 @@ type Config struct {
 	Name     string `json:"db_name"`
 }
 
+
 func LoadConfig(path string) (*Config, error) {
 	var Cfg Config
 	bts, err := ioutil.ReadFile(path)
