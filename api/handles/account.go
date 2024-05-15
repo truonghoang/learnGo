@@ -22,9 +22,9 @@ type RegisterAccount struct {
 }
 
 type Account struct {
-	Id       string `db:"id"`
-	Email    string `db:"email"`
-	Password string `db:"password"`
+	Id       string `json:"id" db:"id"`
+	Email    string `json:"email" db:"email"`
+	Password string `json:"password" db:"password"`
 }
 
 type CustomClaims struct {
@@ -75,11 +75,11 @@ func Login(ctx *gin.Context) {
 	var account LoginAccount
 	db, err := connection.ConnectDb()
 	if err != nil {
-		response.Res400(ctx, err.Error())
+		response.Res400(ctx,"err db:"+ err.Error())
 		return
 	}
 	if err := ctx.BindJSON(&account); err != nil {
-		response.Res400(ctx, err.Error())
+		response.Res400(ctx,"err bind:"+ err.Error())
 		return
 	}
 	// query check email existed
@@ -112,7 +112,7 @@ func Login(ctx *gin.Context) {
 	secret, err := token.SignedString(recretKey)
 
 	if err != nil {
-		response.Res400(ctx, err.Error())
+		response.Res400(ctx,"sign token:"+ err.Error())
 		return
 	}
 

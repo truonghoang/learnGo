@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net/http"
 	"truonghoang/go-scam/response"
 
 	"github.com/dgrijalva/jwt-go"
@@ -59,13 +60,31 @@ func MiddleWare() gin.HandlerFunc {
 func ConfigCors() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		//ctx.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		ctx.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, authorization")
+		// ctx.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		ctx.Writer.Header().Set("Access-Control-Allow-Headers","access-control-allow-origin,Accept, Authorization, Content-Type, Content-Length, X-CSRF-Token, Token, session, Origin, Host, Connection, Accept-Encoding, Accept-Language, X-Requested-With")
 		ctx.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
-		if ctx.Request.Method == "OPTIONS" {
-			ctx.AbortWithStatus(204)
+		if ctx.Request.Method == http.MethodOptions {
+			ctx.AbortWithStatus(http.StatusNoContent)
 			return
-		}
+		  }
 		ctx.Next()
 	}
 }
+
+func Cors(allowOrigin string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+	  c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+	//   c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+	  c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
+	  c.Writer.Header().Set("Access-Control-Allow-Headers", "access-control-allow-origin,Accept, Authorization, Content-Type, Content-Length, X-CSRF-Token, Token, session, Origin, Host, Connection, Accept-Encoding, Accept-Language, X-Requested-With")
+  
+	  if c.Request.Method == http.MethodOptions {
+		c.AbortWithStatus(http.StatusNoContent)
+		return
+	  }
+  
+	  c.Request.Header.Del("Origin")
+  
+	  c.Next()
+	}
+  }
