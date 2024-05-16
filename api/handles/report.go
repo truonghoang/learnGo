@@ -1,79 +1,95 @@
 package handles
 
 import (
-	"fmt"
 	"strconv"
+	"sync"
+	"truonghoang/go-scam/api/query"
 	"truonghoang/go-scam/connection"
 	"truonghoang/go-scam/response"
 
 	"github.com/gin-gonic/gin"
 )
 
-type DataResponse struct {
-	Page      int `json:"page"`
-	TotalPage int `json:"totalPage"`
-	Data      []Product `json:"data"`
+type FormReport struct {
+	RpterId int `json:"reporter_id" `
+	RptedId int `json:"reported_id"`
+	Message string `json:"message"`
+	Reason string `json:"reason"`
 }
-
-type Product struct {
-	Id int `json:"id" db:"id"`
-	Name string `json:"name" db:"name"`
-	Price string `json:"price" db:"price"`
-	Quality string `json:"quality" db:"quality"`
-
-}
-
-const getProduct = "select * from product "
-const baseLimit = "limit"
-const offset ="offset"
-const orderBy ="Order By"
-
-
-
-func ListUserScam(ctx *gin.Context) {
+func ListReport(ctx *gin.Context) {
 	page := ctx.Query("page")
 	limit := ctx.Query("limit")
 
 	parseLimit, err := strconv.Atoi(limit)
-	if parseLimit<=0{
-		parseLimit =1
-	} 
-	if err != nil  {
-		response.Res400(ctx,"Invalid limit")
+	if parseLimit <= 0 {
+		parseLimit = 1
+	}
+	if err != nil {
+		response.Res400(ctx, "Invalid limit")
 		return
 	}
 	parsePage, err := strconv.Atoi(page)
-	fmt.Println(parsePage)
-	
-	if parsePage <=0 {
-		parsePage =1
+
+	if parsePage <= 0 {
+		parsePage = 1
 	}
-	if err != nil  {
-		response.Res400(ctx,"Invalid page")
-		return
-	}
-	
-	offset := (parsePage - 1) * parseLimit
-    
-	db,err:= connection.ConnectDb()
-	if err!=nil{
-		response.Res400(ctx,"connect Db fail")
-		return
-	}
-	fmt.Println(parseLimit,offset)
-	dataQuery:= []Product{}
-	orderBy:=" id "
-	sortOrder:=" ASC "
-    if err:= db.Select(&dataQuery, "SELECT * FROM product ORDER BY" +orderBy+ sortOrder+ "LIMIT ? OFFSET ? ",parseLimit,offset);err!=nil{
-		response.Res400(ctx,err.Error())
+	if err != nil {
+		response.Res400(ctx, "Invalid page")
 		return
 	}
 
-	result := DataResponse{
-		Page: 1,
-		TotalPage: 1,
-		Data: dataQuery,
+	db, err := connection.ConnectDb()
+	if err != nil {
+		response.Res400(ctx, "connect Db fail")
+		return
 	}
 
-	response.Res200(ctx,"list data",result)
+	// query
+	var wg sync.WaitGroup
+	ch_report := make(chan query.Response)
+	wg.Add(1)
+
+	go query.QueryListReport(db, parsePage, parseLimit, ch_report, &wg)
+	dataResponse := <-ch_report
+
+	go func() {
+		wg.Wait()
+		close(ch_report)
+		db.Close()
+	}()
+	if dataResponse.Err {
+		response.Res400(ctx, "query db fail")
+		return
+	}
+
+	response.Res200(ctx, "list data", dataResponse)
+}
+
+func DetailReport(ctx *gin.Context) {
+
+}
+
+func AddReport (ctx *gin.Context){
+
+	var reportInfo FormReport
+	db, err := connection.ConnectDb()
+	if err != nil {
+		response.Res400(ctx, "err db:"+err.Error())
+		return
+	}
+	if err := ctx.BindJSON(&reportInfo); err != nil {
+		response.Res400(ctx, "err bind:"+err.Error())
+		return
+	}
+
+	var wg sync.WaitGroup
+	ch_add := make(chan bool)
+	wg.Add(1)
+
+	go query.InsertReport(db,reportInfo.RpterId,reportInfo.RptedId,reportInfo.Message,reportInfo.Reason,ch_add,&wg)
+	go func (){
+		wg.Wait()
+		db.Close()
+	}()
+
 }
