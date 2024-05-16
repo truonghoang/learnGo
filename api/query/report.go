@@ -1,6 +1,7 @@
 package query
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/jmoiron/sqlx"
@@ -33,10 +34,9 @@ type RecordDetail struct {
 	Time    string `json:"created_at" db:"created_at"`
 }
 type ResponseDetail struct {
-	Data  []RecordDetail `json:"data"`
+	Data  RecordDetail `json:"data"`
 	Err   bool     `json:"error"`
-	Limit int      `json:"limit"`
-	Page  int      `json:"page"`
+	
 }
 type Response struct {
 	Data  []Record `json:"data"`
@@ -68,13 +68,13 @@ func QueryListReport(db *sqlx.DB, page int, limit int, ch chan Response, wg *syn
 
 }
 
-func QueryDetailReport(db *sqlx.DB, page int, limit int, ch chan ResponseDetail, wg *sync.WaitGroup) {
+func QueryDetailReport(db *sqlx.DB, id int, ch chan ResponseDetail, wg *sync.WaitGroup) {
 	defer wg.Done()
-	offset := (page - 1) * limit
+	
 	var responseData ResponseDetail
-	dataResult := make([]RecordDetail, limit)
+	dataResult := RecordDetail{}
 
-	err := db.Select(&dataResult, "SELECT report.id,report.created_at,u1.first_name AS name_reporter,u2.first_name AS reported_name,u1.phone AS phone_reporter,u2.phone AS phone_reported FROM report INNER JOIN user u1 ON report.reporter_id=u1.id INNER JOIN user u2 ON report.report_id =u2.id ORDER BY id LIMIT ? OFFSET ? ", limit, offset)
+	err := db.Select(&dataResult, "SELECT report.id,report.created_at,u1.first_name AS name_reporter,u2.first_name AS reported_name,u1.phone AS phone_reporter,u2.phone AS phone_reported FROM report INNER JOIN user u1 ON report.reporter_id=u1.id INNER JOIN user u2 ON report.report_id =u2.id WHERE report.id=? ",id )
 	if err != nil {
 
 		responseData.Err = true
@@ -84,14 +84,14 @@ func QueryDetailReport(db *sqlx.DB, page int, limit int, ch chan ResponseDetail,
 
 	responseData.Err = false
 	responseData.Data = dataResult
-	responseData.Limit = limit
-	responseData.Page = page
+	
 
 	ch <- responseData
 }
 
 func InsertReport(db *sqlx.DB, reporterId int, reportedId int,message string, reason string, ch chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
+	fmt.Print(reportedId,reportedId,message,reason)
 	tx := db.MustBegin()
 	tx.MustExec("INSERT INTO report(reporter_id, report_id, message, reason) VALUES(?, ?, ?, ?)", reporterId,reportedId, message, reason)
 	if err := tx.Commit(); err != nil {

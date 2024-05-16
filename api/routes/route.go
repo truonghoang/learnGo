@@ -41,12 +41,12 @@ func RouteUserScam(route *gin.RouterGroup) {
             handles.ListReport(ctx)
 		})
 
-		routeUserScam.DELETE("/", func(ctx *gin.Context) {
-            
+		routeUserScam.POST("/", func(ctx *gin.Context) {
+            handles.AddReport(ctx)
 		})
 
 		routeUserScam.GET("/:id", func(ctx *gin.Context) {
-            
+            handles.DetailReport(ctx)
 		})
 	}
 }
