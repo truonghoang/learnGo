@@ -1,6 +1,7 @@
 package handles
 
 import (
+	
 	"strconv"
 	"sync"
 	"truonghoang/go-scam/api/query"
@@ -88,18 +89,18 @@ func DetailReport(ctx *gin.Context) {
 	go query.QueryDetailReport(db, id, ch_detail, &wg)
 
 	detail := <-ch_detail
+	
+	if detail.Err {
+		response.Res400(ctx, "get report  failure")
+		return
+	}
 	go func() {
 		wg.Wait()
 		close(ch_detail)
 		db.Close()
 	}()
 
-	if detail.Err {
-		response.Res400(ctx, "get user  failure")
-		return
-	}
-
-	response.Res200(ctx, "get user success", detail.Data)
+	response.Res200(ctx, "get report success", detail.Data)
 
 }
 

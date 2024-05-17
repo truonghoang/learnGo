@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/jmoiron/sqlx"
@@ -26,7 +27,6 @@ type RecordDetail struct {
 	FirstNameReported string `json:"firstname_rpted" db:"firstname_rpted"`
 	LastNameReported  string `json:"lastname_rpted" db:"lastname_rpted"`
 	EmailReported     string `json:"email_rpted" db:"email_rpted"`
-	ReportedName      string `json:"reported_name" db:"reported_name"`
 	ReportedPhone     string `json:"phone_rpted" db:"phone_rpted"`
 
 	Message string `json:"message" db:"message"`
@@ -34,15 +34,15 @@ type RecordDetail struct {
 	Time    string `json:"created_at" db:"created_at"`
 }
 type ResponseDetail struct {
-	Data  RecordDetail `json:"data"`
-	Err   bool     `json:"error"`
-	
+	Data RecordDetail `json:"data"`
+	Err  bool         `json:"error"`
 }
 type Response struct {
 	Data  []Record `json:"data"`
 	Err   bool     `json:"error"`
 	Limit int      `json:"limit"`
 	Page  int      `json:"page"`
+	Total int      `json:"totalPage"`
 }
 
 func QueryListReport(db *sqlx.DB, page int, limit int, ch chan Response, wg *sync.WaitGroup) {
@@ -50,15 +50,30 @@ func QueryListReport(db *sqlx.DB, page int, limit int, ch chan Response, wg *syn
 	offset := (page - 1) * limit
 	var responseData Response
 	dataResult := make([]Record, limit)
+	query := `SELECT  report.id,report.created_at,u1.first_name AS name_reporter,u2.first_name AS reported_name,u1.phone AS phone_reporter,u2.phone AS phone_reported 
+	FROM report 
+	JOIN user u1 ON report.reporter_id=u1.id 
+	JOIN user u2 ON report.report_id =u2.id 
+	ORDER BY id LIMIT ? OFFSET ?`
+	countQuery := `SELECT count(id) as totalPage from report`
+	err := db.Select(&dataResult, query, limit, offset)
 
-	err := db.Select(&dataResult, "SELECT report.id,report.created_at,u1.first_name AS name_reporter,u2.first_name AS reported_name,u1.phone AS phone_reporter,u2.phone AS phone_reported FROM report INNER JOIN user u1 ON report.reporter_id=u1.id INNER JOIN user u2 ON report.report_id =u2.id ORDER BY id LIMIT ? OFFSET ? ", limit, offset)
 	if err != nil {
-
 		responseData.Err = true
 		ch <- responseData
 		return
 	}
 
+	var count int
+	error2 := db.QueryRow(countQuery).Scan(&count)
+
+	if error2 != nil {
+		responseData.Err = true
+		ch <- responseData
+		return
+	}
+	totalPage:=math.Ceil(float64(count/limit))
+	responseData.Total = int(totalPage)
 	responseData.Err = false
 	responseData.Data = dataResult
 	responseData.Limit = limit
@@ -70,13 +85,21 @@ func QueryListReport(db *sqlx.DB, page int, limit int, ch chan Response, wg *syn
 
 func QueryDetailReport(db *sqlx.DB, id int, ch chan ResponseDetail, wg *sync.WaitGroup) {
 	defer wg.Done()
-	
+
 	var responseData ResponseDetail
 	dataResult := RecordDetail{}
 
-	err := db.Select(&dataResult, "SELECT report.id,report.created_at,u1.first_name AS name_reporter,u2.first_name AS reported_name,u1.phone AS phone_reporter,u2.phone AS phone_reported FROM report INNER JOIN user u1 ON report.reporter_id=u1.id INNER JOIN user u2 ON report.report_id =u2.id WHERE report.id=? ",id )
-	if err != nil {
+	query := `SELECT report.id,report.created_at,report.message,report.reason,u1.last_name AS lastname_rpter,u1.first_name AS firstname_rpter,u1.phone AS phone_rpter,u2.phone AS phone_rpted ,u3.email AS email_rpter,u4.email AS email_rpted, u2.first_name AS firstname_rpted, u2.last_name AS lastname_rpted
+	  FROM report
+	  JOIN user u1 ON report.reporter_id=u1.id
+	  JOIN user u2 ON  report.report_id =u2.id
+	  JOIN user_name u3 ON report.reporter_id =u3.uid
+	  JOIN user_name u4 ON report.report_id =u4.uid
+	  WHERE report.id=?`
 
+	err := db.Get(&dataResult, query, id)
+	if err != nil {
+		fmt.Print("eror ne:" + err.Error())
 		responseData.Err = true
 		ch <- responseData
 		return
@@ -84,16 +107,15 @@ func QueryDetailReport(db *sqlx.DB, id int, ch chan ResponseDetail, wg *sync.Wai
 
 	responseData.Err = false
 	responseData.Data = dataResult
-	
 
 	ch <- responseData
 }
 
-func InsertReport(db *sqlx.DB, reporterId int, reportedId int,message string, reason string, ch chan bool, wg *sync.WaitGroup) {
+func InsertReport(db *sqlx.DB, reporterId int, reportedId int, message string, reason string, ch chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
-	fmt.Print(reportedId,reportedId,message,reason)
+	fmt.Print(reportedId, reportedId, message, reason)
 	tx := db.MustBegin()
-	tx.MustExec("INSERT INTO report(reporter_id, report_id, message, reason) VALUES(?, ?, ?, ?)", reporterId,reportedId, message, reason)
+	tx.MustExec("INSERT INTO report(reporter_id, report_id, message, reason) VALUES(?, ?, ?, ?)", reporterId, reportedId, message, reason)
 	if err := tx.Commit(); err != nil {
 
 		ch <- false
@@ -102,4 +124,3 @@ func InsertReport(db *sqlx.DB, reporterId int, reportedId int,message string, re
 	ch <- true
 
 }
-

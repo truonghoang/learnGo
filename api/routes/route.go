@@ -16,37 +16,45 @@ func RouteAccount(route *gin.RouterGroup) {
 		accountGroup.POST(("/login"), func(ctx *gin.Context) {
 			handles.Login(ctx)
 		})
-		
+
 	}
 }
 
 func RouteUser(route *gin.RouterGroup) {
 	accountGroup := route.Group("/user")
-	{
+	{	// select user
+		accountGroup.GET("/select", func(ctx *gin.Context) {
+			handles.SelectUser(ctx)
+		})
+		//search user by phone
+		accountGroup.GET(("/search"), func(ctx *gin.Context) {
+			handles.GetDetailUser(ctx, true)
+		})
+		//detail user
 		accountGroup.GET("/:id", func(ctx *gin.Context) {
-			handles.GetDetailUser(ctx,false)
+			handles.GetDetailUser(ctx, false)
 		})
-		//search
-		accountGroup.GET(("/"), func(ctx *gin.Context) {
-			handles.GetDetailUser(ctx,true)
+		//list user pagination
+		accountGroup.GET("", func(ctx *gin.Context) {
+			handles.ListUser(ctx)
 		})
-		
+
 	}
 }
 func RouteUserScam(route *gin.RouterGroup) {
 	routeUserScam := route.Group("/report")
 	// .Use(middleware.MiddleWare())
 	{
-		routeUserScam.GET("/", func(ctx *gin.Context) {
-            handles.ListReport(ctx)
+		routeUserScam.GET("", func(ctx *gin.Context) {
+			handles.ListReport(ctx)
 		})
 
-		routeUserScam.POST("/", func(ctx *gin.Context) {
-            handles.AddReport(ctx)
+		routeUserScam.POST("", func(ctx *gin.Context) {
+			handles.AddReport(ctx)
 		})
 
 		routeUserScam.GET("/:id", func(ctx *gin.Context) {
-            handles.DetailReport(ctx)
+			handles.DetailReport(ctx)
 		})
 	}
 }

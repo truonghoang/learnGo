@@ -157,7 +157,7 @@ func Login(ctx *gin.Context) {
 	var recretKey = []byte("scamreportserver")
 
 	claims := CustomClaims{
-		Id:    strconv.Itoa(resultData.User.ID),
+		Id:    strconv.Itoa(resultData.User.Id),
 		Email: resultData.User.Email,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(15 * time.Minute).Unix(),
@@ -220,3 +220,69 @@ func GetDetailUser(ctx *gin.Context, search bool) {
 	response.Res200(ctx, "get user success", detail.User)
 
 }
+
+func ListUser (ctx *gin.Context){
+	db,err := connection.ConnectDb()
+	
+	if err!=nil {
+		response.Res400(ctx,"connect db failure")
+		return
+	}
+	ch_list_user := make(chan query.ResponseListUser)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	parsePage,err := strconv.Atoi(ctx.Query("page"))
+	if err != nil {
+		response.Res400(ctx,"parser page err")
+		return
+	}
+	parseLimit,err:= strconv.Atoi(ctx.Query("limit"))
+	if err != nil {
+		response.Res400(ctx,"parser limit err")
+		return
+	}
+
+	go query.ListUser(db,parseLimit,parsePage,ch_list_user,&wg)
+
+	resultQuery := <- ch_list_user
+	if resultQuery.Err {
+		response.Res400(ctx,"query data failure")
+		return
+	}
+	go func (){
+		wg.Wait()
+		close(ch_list_user)
+		db.Close()
+	}()
+
+	response.Res200(ctx,"list user successfully",resultQuery)
+}
+
+
+func SelectUser (ctx *gin.Context){
+	db,err := connection.ConnectDb()
+	
+	if err!=nil {
+		response.Res400(ctx,"connect db failure")
+		return
+	}
+	ch_sel_user := make(chan query.ResponseUserName)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	
+	go query.ListUserSelect(db,ch_sel_user,&wg)
+
+	resultQuery := <- ch_sel_user
+	if resultQuery.Err {
+		response.Res400(ctx,"query data failure")
+		return
+	}
+	go func (){
+		wg.Wait()
+		close(ch_sel_user)
+		db.Close()
+	}()
+
+	response.Res200(ctx,"list user successfully",resultQuery.Data)
+}
+
