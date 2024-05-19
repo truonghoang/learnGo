@@ -17,7 +17,9 @@ type FormReport struct {
 	Message string `json:"message"`
 	Reason  string `json:"reason"`
 }
-
+type DeleteResponse struct {
+	Data bool `json:"data"`
+}
 func ListReport(ctx *gin.Context) {
 	page := ctx.Query("page")
 	limit := ctx.Query("limit")
@@ -137,4 +139,26 @@ func AddReport(ctx *gin.Context) {
 	}
 	response.Res201(ctx, "send report successfully")
 
+}
+
+func DeleteReport (ctx *gin.Context){
+	db,err:= connection.ConnectDb()
+	if err!= nil{
+		response.Res400(ctx,"connect db failure")
+		return
+	}
+	idParam,err := strconv.Atoi(ctx.Param("id")) 
+	if err!=nil{
+		response.Res400(ctx,"parser param error")
+	}
+	var wg sync.WaitGroup
+	ch_delete := make(chan bool)
+	wg.Add(1)
+	go query.DeleteReport(db,idParam,ch_delete,&wg)
+	success:= <-ch_delete
+	if !success{
+response.Res400(ctx,"delete failure")
+return
+	} 
+	response.Res200(ctx,"delete successfully",DeleteResponse{Data: true})
 }

@@ -42,19 +42,22 @@ func RouteUser(route *gin.RouterGroup) {
 	}
 }
 func RouteUserScam(route *gin.RouterGroup) {
-	routeUserScam := route.Group("/report")
+	routeReport := route.Group("/report")
 	// .Use(middleware.MiddleWare())
 	{
-		routeUserScam.GET("", func(ctx *gin.Context) {
+		routeReport.GET("", func(ctx *gin.Context) {
 			handles.ListReport(ctx)
 		})
 
-		routeUserScam.POST("", func(ctx *gin.Context) {
+		routeReport.POST("", func(ctx *gin.Context) {
 			handles.AddReport(ctx)
 		})
 
-		routeUserScam.GET("/:id", func(ctx *gin.Context) {
+		routeReport.GET("/:id", func(ctx *gin.Context) {
 			handles.DetailReport(ctx)
+		})
+		routeReport.DELETE("/:id",func(ctx *gin.Context){
+			handles.DeleteReport(ctx)
 		})
 	}
 }

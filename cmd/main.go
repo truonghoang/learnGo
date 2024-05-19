@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const port = "localhost:80"
+const port = "localhost:8080"
 
 func main() {
 

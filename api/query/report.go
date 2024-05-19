@@ -124,3 +124,16 @@ func InsertReport(db *sqlx.DB, reporterId int, reportedId int, message string, r
 	ch <- true
 
 }
+
+func DeleteReport(db *sqlx.DB,id int, ch chan bool,wg *sync.WaitGroup){
+	defer wg.Done()
+	row,err:= db.Query("delete from report where id=?",id)
+	if err!= nil {
+		ch <- false
+		return
+	}
+	fmt.Print(row)
+	ch <- true
+
+
+}
