@@ -5,14 +5,13 @@ CREATE TABLE user (
     phone VARCHAR(20) unique,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
-    password varchar(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 CREATE TABLE user_name (
 	id INT AUTO_INCREMENT PRIMARY KEY,
-    uid INT ,
-    email VARCHAR(255) NOT NULL unique,
+    peer_id INT ,
+    link VARCHAR(255) NOT NULL unique,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (uid) REFERENCES user(id)
@@ -32,4 +31,5 @@ CREATE TABLE report (
 
 CREATE INDEX idx_id_phone ON user(id, phone);
 
-egwt3EYxR_Uuw1msXy3n
+account : suAdmin@vccorp.vn
+pw:adminvccorp

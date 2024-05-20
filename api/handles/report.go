@@ -69,6 +69,59 @@ func ListReport(ctx *gin.Context) {
 	response.Res200(ctx, "list data", dataResponse)
 }
 
+func FilterReportByReason(ctx *gin.Context) {
+	page := ctx.Query("page")
+	limit := ctx.Query("limit")
+	reason := ctx.Query("reason")
+	parseLimit, err := strconv.Atoi(limit)
+	if parseLimit <= 0 {
+		parseLimit = 1
+	}
+	if err != nil {
+		response.Res400(ctx, "Invalid limit")
+		return
+	}
+	parsePage, err := strconv.Atoi(page)
+
+	if parsePage <= 0 {
+		parsePage = 1
+	}
+	if err != nil {
+		response.Res400(ctx, "Invalid page")
+		return
+	}
+	parserReason, err := strconv.Atoi(reason)
+	if err != nil {
+		response.Res400(ctx, "Invalid reason")
+		return
+	}
+	db, err := connection.ConnectDb()
+	if err != nil {
+		response.Res400(ctx, "connect Db fail")
+		return
+	}
+
+	// query
+	var wg sync.WaitGroup
+	ch_report := make(chan query.Response)
+	wg.Add(1)
+
+	go query.FilterByTypeReason(db,parserReason, parsePage, parseLimit, ch_report, &wg)
+	dataResponse := <-ch_report
+
+	go func() {
+		wg.Wait()
+		close(ch_report)
+		db.Close()
+	}()
+	if dataResponse.Err {
+		response.Res400(ctx, "query db fail")
+		return
+	}
+
+	response.Res200(ctx, "list data", dataResponse)
+}
+
 func DetailReport(ctx *gin.Context) {
 	db, err := connection.ConnectDb()
 	if err != nil {

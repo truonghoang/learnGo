@@ -52,7 +52,9 @@ func RouteUserScam(route *gin.RouterGroup) {
 		routeReport.POST("", func(ctx *gin.Context) {
 			handles.AddReport(ctx)
 		})
-
+		routeReport.GET("/filter",func(ctx *gin.Context){
+			handles.FilterReportByReason(ctx)
+		})
 		routeReport.GET("/:id", func(ctx *gin.Context) {
 			handles.DetailReport(ctx)
 		})

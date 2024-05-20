@@ -50,7 +50,7 @@ func MiddleWare() gin.HandlerFunc {
 			ctx.Abort()
 			return
 		}
-		ctx.Set("user", decode)
+		ctx.Set("user", decode.Id)
 
 		ctx.Next()
 	}

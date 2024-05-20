@@ -1,10 +1,13 @@
 package handles
 
 import (
+	"os"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
 	"truonghoang/go-scam/api/query"
+	"truonghoang/go-scam/config"
 	"truonghoang/go-scam/connection"
 	"truonghoang/go-scam/response"
 
@@ -117,37 +120,30 @@ func Register(ctx *gin.Context) {
 
 func Login(ctx *gin.Context) {
 	var account LoginUser
-	db, err := connection.ConnectDb()
-	if err != nil {
-		response.Res400(ctx, "err db:"+err.Error())
-		return
-	}
 	if err := ctx.BindJSON(&account); err != nil {
 		response.Res400(ctx, "err bind:"+err.Error())
 		return
 	}
-	// query check email existed
-	var wg sync.WaitGroup
-	ch_login := make(chan query.ResultLogin)
-
-	wg.Add(1)
-
-	go query.QueryEmail(db, account.Email, ch_login, &wg)
-
-	resultData := <-ch_login
-
-	go func() {
-		wg.Wait()
-		close(ch_login)
-		db.Close()
-	}()
-
-	if resultData.Error {
-		response.Res400(ctx, "request data login failure")
+	pwd, err := os.Getwd()
+	if err != nil {
+		response.Res400(ctx, "Not load path from system")
 		return
 	}
+	cfg, err := config.LoadConfigAccount(pwd + "/config/admin.json")
+	if err != nil {
+		response.Res400(ctx, "Not load account from system")
+		return
+	}
+	// Define a regex pattern for validating email
+	var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	success := emailRegex.MatchString(account.Email)
+	if !success {
+		response.Res400(ctx, "email invalid")
+		return
+	}
+
 	// compare password
-	if err := bcrypt.CompareHashAndPassword([]byte(resultData.User.Password), []byte(account.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(cfg.Password), []byte(account.Password)); err != nil {
 		response.Res400(ctx, "password invalid")
 		return
 	}
@@ -157,8 +153,8 @@ func Login(ctx *gin.Context) {
 	var recretKey = []byte("scamreportserver")
 
 	claims := CustomClaims{
-		Id:    strconv.Itoa(resultData.User.Id),
-		Email: resultData.User.Email,
+		Id:    cfg.Role,
+		Email: cfg.Account,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(15 * time.Minute).Unix(),
 			IssuedAt:  time.Now().Unix(),
@@ -171,9 +167,8 @@ func Login(ctx *gin.Context) {
 		response.Res400(ctx, "sign token:"+err.Error())
 		return
 	}
-
 	dataRes := ResponseData{
-		Email: resultData.User.Email,
+		Email: cfg.Account,
 		Token: secret,
 	}
 	response.Res200(ctx, "login successfully", dataRes)
@@ -221,68 +216,66 @@ func GetDetailUser(ctx *gin.Context, search bool) {
 
 }
 
-func ListUser (ctx *gin.Context){
-	db,err := connection.ConnectDb()
-	
-	if err!=nil {
-		response.Res400(ctx,"connect db failure")
+func ListUser(ctx *gin.Context) {
+	db, err := connection.ConnectDb()
+
+	if err != nil {
+		response.Res400(ctx, "connect db failure")
 		return
 	}
 	ch_list_user := make(chan query.ResponseListUser)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	parsePage,err := strconv.Atoi(ctx.Query("page"))
+	parsePage, err := strconv.Atoi(ctx.Query("page"))
 	if err != nil {
-		response.Res400(ctx,"parser page err")
+		response.Res400(ctx, "parser page err")
 		return
 	}
-	parseLimit,err:= strconv.Atoi(ctx.Query("limit"))
+	parseLimit, err := strconv.Atoi(ctx.Query("limit"))
 	if err != nil {
-		response.Res400(ctx,"parser limit err")
+		response.Res400(ctx, "parser limit err")
 		return
 	}
 
-	go query.ListUser(db,parseLimit,parsePage,ch_list_user,&wg)
+	go query.ListUser(db, parseLimit, parsePage, ch_list_user, &wg)
 
-	resultQuery := <- ch_list_user
+	resultQuery := <-ch_list_user
 	if resultQuery.Err {
-		response.Res400(ctx,"query data failure")
+		response.Res400(ctx, "query data failure")
 		return
 	}
-	go func (){
+	go func() {
 		wg.Wait()
 		close(ch_list_user)
 		db.Close()
 	}()
 
-	response.Res200(ctx,"list user successfully",resultQuery)
+	response.Res200(ctx, "list user successfully", resultQuery)
 }
 
+func SelectUser(ctx *gin.Context) {
+	db, err := connection.ConnectDb()
 
-func SelectUser (ctx *gin.Context){
-	db,err := connection.ConnectDb()
-	
-	if err!=nil {
-		response.Res400(ctx,"connect db failure")
+	if err != nil {
+		response.Res400(ctx, "connect db failure")
 		return
 	}
 	ch_sel_user := make(chan query.ResponseUserName)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	
-	go query.ListUserSelect(db,ch_sel_user,&wg)
 
-	resultQuery := <- ch_sel_user
+	go query.ListUserSelect(db, ch_sel_user, &wg)
+
+	resultQuery := <-ch_sel_user
 	if resultQuery.Err {
-		response.Res400(ctx,"query data failure")
+		response.Res400(ctx, "query data failure")
 		return
 	}
-	go func (){
+	go func() {
 		wg.Wait()
 		close(ch_sel_user)
 		db.Close()
 	}()
 
-	response.Res200(ctx,"list user successfully",resultQuery.Data)
+	response.Res200(ctx, "list user successfully", resultQuery.Data)
 }
-
