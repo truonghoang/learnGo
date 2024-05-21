@@ -12,10 +12,13 @@ type Config struct {
 	DB_Name     string `json:"db_name"`
 }
 
+type Account struct {
+	Role string `json:"role"`
+	Account string `json:"account"`
+	Password string `json:"password"`
+}
 type AccountConfig struct {
-	Role string `json:"super"`
-	Account string `json:"acc_super"`
-	Password string `json:"pw_super"`
+	Data []Account `json:"data"`
 }
 
 func LoadConfig(path string) (*Config, error) {

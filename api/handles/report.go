@@ -1,7 +1,7 @@
 package handles
 
 import (
-	
+	"fmt"
 	"strconv"
 	"sync"
 	"truonghoang/go-scam/api/query"
@@ -51,11 +51,12 @@ func ListReport(ctx *gin.Context) {
 	// query
 	var wg sync.WaitGroup
 	ch_report := make(chan query.Response)
+	
 	wg.Add(1)
 
 	go query.QueryListReport(db, parsePage, parseLimit, ch_report, &wg)
+	
 	dataResponse := <-ch_report
-
 	go func() {
 		wg.Wait()
 		close(ch_report)
@@ -131,7 +132,7 @@ func DetailReport(ctx *gin.Context) {
 
 	var wg sync.WaitGroup
 
-	ch_detail := make(chan query.ResponseDetail)
+	ch_detail := make(chan query.Basic)
 
 	wg.Add(1)
 
@@ -141,21 +142,35 @@ func DetailReport(ctx *gin.Context) {
 		response.Res400(ctx, "parse id failure")
 		return
 	}
-	go query.QueryDetailReport(db, id, ch_detail, &wg)
+	infoUser,err := query.CountAccountAndLinkByPhone(db,id)
+	if err!=nil {
+		fmt.Print(err)
+		response.Res400(ctx,"get data fail")
+	return
+	}
+	go query.BasicDetail(db, infoUser.PeerId,infoUser.Phone, ch_detail, &wg)
 
 	detail := <-ch_detail
+	
+	 result := query.RecordDetail{}
+	 result.FirstName=infoUser.FirstName
+	 result.LastName=infoUser.LastName
+	 result.Phone=infoUser.Phone
+	 result.TotalAccount=detail.TotalAccount
+	 result.TotalLink=detail.TotalLink
 	
 	if detail.Err {
 		response.Res400(ctx, "get report  failure")
 		return
 	}
+	
 	go func() {
 		wg.Wait()
 		close(ch_detail)
 		db.Close()
 	}()
 
-	response.Res200(ctx, "get report success", detail.Data)
+	response.Res200(ctx, "get report success", result)
 
 }
 
@@ -215,3 +230,61 @@ return
 	} 
 	response.Res200(ctx,"delete successfully",DeleteResponse{Data: true})
 }
+
+
+func SearchPhoneReport (ctx *gin.Context){
+	
+		page := ctx.Query("page")
+		limit := ctx.Query("limit")
+		phone := ctx.Query("phone")
+	
+		parseLimit, err := strconv.Atoi(limit)
+		if parseLimit <= 0 {
+			parseLimit = 1
+		}
+		if err != nil {
+			response.Res400(ctx, "Invalid limit")
+			return
+		}
+		parsePage, err := strconv.Atoi(page)
+	
+		if parsePage <= 0 {
+			parsePage = 1
+		}
+		if err != nil {
+			response.Res400(ctx, "Invalid page")
+			return
+		}
+	
+		db, err := connection.ConnectDb()
+		if err != nil {
+			response.Res400(ctx, "connect Db fail")
+			return
+		}
+	
+		// query
+		var wg sync.WaitGroup
+		ch_report := make(chan query.Response)
+		
+		wg.Add(1)
+	
+		go query.SearchReportByPhone(db,phone,parseLimit,parsePage,ch_report,&wg)
+		
+		dataResponse := <-ch_report
+
+		go func() {
+			wg.Wait()
+			close(ch_report)
+			db.Close()
+		}()
+		if dataResponse.Err {
+			response.Res400(ctx, "query db fail")
+			return
+		}
+	
+		response.Res200(ctx, "list data", dataResponse)
+	
+}
+
+
+

@@ -1,5 +1,17 @@
-{   "role":"super",
-    "acc_super" :"suAdmin@vccorp.vn",
-    "pw_super":"$2a$10$MwcWHa5Hqn3Gr6/IOtaB4uUGNBQ5BSpizgpDiBbLMsAlwblBwFc/i"
+{
+  "data": [
+    {
+      "role": "super",
+      "account": "suAdmin@vccorp.vn",
+      "password": "$2a$10$MwcWHa5Hqn3Gr6/IOtaB4uUGNBQ5BSpizgpDiBbLMsAlwblBwFc/i"
+    },{
+        "role": "admin",
+      "account": "admin@vccorp.vn",
+      "password": "$2a$10$MwcWHa5Hqn3Gr6/IOtaB4uUGNBQ5BSpizgpDiBbLMsAlwblBwFc/i"
+    },{
+        "role": "user",
+        "account": "user@vccorp.vn",
+        "password": "$2a$10$MwcWHa5Hqn3Gr6/IOtaB4uUGNBQ5BSpizgpDiBbLMsAlwblBwFc/i"
+    }
+  ]
 }
-

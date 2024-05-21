@@ -78,36 +78,32 @@ func ListUser(db *sqlx.DB, limit int, page int, ch chan ResponseListUser, wg *sy
 	offset := (page - 1) * limit
 	var resultResponse ResponseListUser
 	result := make([]UserInfo, limit)
-
 	err := db.Select(&result, `select users.id,users.first_name,users.last_name,users.phone,username.link from users JOIN username ON users.id=username.peer_id AND username.peer_type=2 ORDER by id DESC  limit ? offset ?`, limit, offset)
 	if err != nil {
 		resultResponse.Err = true
 		ch <- resultResponse
 		return
 	}
-
-	var count float64
-	countQuery := `SELECT count(id) as totalPage from users`
-	error2 := db.QueryRow(countQuery).Scan(&count)
-
-	if error2 != nil {
-		resultResponse.Err = true
-		ch <- resultResponse
-		return
-	}
-	parseLimit := float64(limit)
-	totalPage:=math.Ceil(float64(count/parseLimit))
-	
-	fmt.Println(count,limit,totalPage)
-	
 	resultResponse.Err = false
 	resultResponse.Data = result
 	resultResponse.Limit = limit
 	resultResponse.Page = page
-	resultResponse.Total = int(totalPage)
 	ch <- resultResponse
 }
+func CountListUser (db *sqlx.DB,limit int, ch chan int,wg *sync.WaitGroup){
+	defer wg.Done()
+	
+	countQuery := `SELECT count(id) as totalPage from users`
+	var count float64
+	error2 := db.QueryRow(countQuery).Scan(&count)
+	if error2 != nil {
+		ch <- 0
+		return
+	}
+	totalPage := math.Ceil(float64(count / float64(limit)))
 
+	ch <- int(totalPage)
+}
 
 func InsertUser(db *sqlx.DB, phone string, first_name string, last_name string, password string, ch chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()

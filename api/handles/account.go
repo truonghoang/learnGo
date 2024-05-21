@@ -1,6 +1,7 @@
 package handles
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -141,9 +142,26 @@ func Login(ctx *gin.Context) {
 		response.Res400(ctx, "email invalid")
 		return
 	}
+	exist := false
+	userSystem := config.Account{}
+	
+	for _, acc := range cfg.Data {
+		
+		if acc.Account == account.Email {
+			userSystem.Password = acc.Password
+			userSystem.Role = acc.Role
+			userSystem.Account = acc.Account
+			exist = true
+			break
+		}
 
+	}
+	if !exist {
+		response.Res400(ctx, "email not exist")
+		return
+	}
 	// compare password
-	if err := bcrypt.CompareHashAndPassword([]byte(cfg.Password), []byte(account.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(userSystem.Password), []byte(account.Password)); err != nil {
 		response.Res400(ctx, "password invalid")
 		return
 	}
@@ -153,8 +171,8 @@ func Login(ctx *gin.Context) {
 	var recretKey = []byte("scamreportserver")
 
 	claims := CustomClaims{
-		Id:    cfg.Role,
-		Email: cfg.Account,
+		Id:    userSystem.Role,
+		Email: userSystem.Account,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(15 * time.Minute).Unix(),
 			IssuedAt:  time.Now().Unix(),
@@ -168,7 +186,7 @@ func Login(ctx *gin.Context) {
 		return
 	}
 	dataRes := ResponseData{
-		Email: cfg.Account,
+		Email: userSystem.Account,
 		Token: secret,
 	}
 	response.Res200(ctx, "login successfully", dataRes)
@@ -225,7 +243,6 @@ func ListUser(ctx *gin.Context) {
 	}
 	ch_list_user := make(chan query.ResponseListUser)
 	var wg sync.WaitGroup
-	wg.Add(1)
 	parsePage, err := strconv.Atoi(ctx.Query("page"))
 	if err != nil {
 		response.Res400(ctx, "parser page err")
@@ -236,14 +253,23 @@ func ListUser(ctx *gin.Context) {
 		response.Res400(ctx, "parser limit err")
 		return
 	}
-
+	ch_total := make(chan int)
+	wg.Add(2)
+	go query.CountListUser(db, parseLimit, ch_total, &wg)
 	go query.ListUser(db, parseLimit, parsePage, ch_list_user, &wg)
 
 	resultQuery := <-ch_list_user
+	resultTotal := <-ch_total
+	if resultTotal == 0 {
+		response.Res400(ctx, "count record fail")
+		return
+	}
+	resultQuery.Total = resultTotal
 	if resultQuery.Err {
 		response.Res400(ctx, "query data failure")
 		return
 	}
+	fmt.Print(resultQuery)
 	go func() {
 		wg.Wait()
 		close(ch_list_user)
