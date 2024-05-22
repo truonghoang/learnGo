@@ -64,6 +64,16 @@ func RouteUserScam(route *gin.RouterGroup) {
 		routeReport.DELETE("/:id",func(ctx *gin.Context){
 			handles.DeleteReport(ctx)
 		})
+		routeReport.GET("/detail/account",func(ctx *gin.Context) {
+			handles.GetListAccountByDetail(ctx)
+		})
+		routeReport.GET("/detail/link",func(ctx *gin.Context) {
+			handles.GetListLinkByDetail(ctx)
+		})
+		routeReport.GET("/detail/list",func(ctx *gin.Context) {
+			handles.GetListReportByPeerId(ctx)
+		})
+
 	}
 }
 

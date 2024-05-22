@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	
 	"truonghoang/go-scam/api/query"
 	"truonghoang/go-scam/connection"
 	"truonghoang/go-scam/response"
@@ -158,6 +159,7 @@ func DetailReport(ctx *gin.Context) {
 	 result.Phone=infoUser.Phone
 	 result.TotalAccount=detail.TotalAccount
 	 result.TotalLink=detail.TotalLink
+	 result.PeerId =infoUser.PeerId
 	
 	if detail.Err {
 		response.Res400(ctx, "get report  failure")
@@ -286,5 +288,64 @@ func SearchPhoneReport (ctx *gin.Context){
 	
 }
 
+func GetListAccountByDetail(ctx *gin.Context){
+	db, err := connection.ConnectDb()
+		if err != nil {
+			response.Res400(ctx, "connect Db fail")
+			return
+		}
+	phone:= ctx.Query("phone")
 
+	result,err:=query.QueryListAccountWithAndNumberReport(db,phone)
+	if err!=nil{
+		response.Res400(ctx,"query failure")
+		return
+	}
+	db.Close()
+	response.Res200(ctx,"list account success",result)
+}
+
+
+func GetListLinkByDetail(ctx *gin.Context){
+	db, err := connection.ConnectDb()
+		if err != nil {
+			response.Res400(ctx, "connect Db fail")
+			return
+		}
+	id,err:= strconv.Atoi(ctx.Query("id"))
+	if err!=nil{
+		response.Res400(ctx,"fail parser")
+		return
+	}
+
+	result,err:=query.QueryListLinkByPeerId(db,id)
+	if err!=nil{
+		response.Res400(ctx,"query failure")
+		return
+	}
+	db.Close()
+	response.Res200(ctx,"list account success",result)
+}
+
+ func GetListReportByPeerId (ctx *gin.Context){
+	id,err := strconv.Atoi(ctx.Query("id"))
+	
+	if err!=nil {
+		response.Res400(ctx,"parser failure")
+		return
+	}
+	db,err:= connection.ConnectDb()
+	if err !=nil{
+		response.Res400(ctx,"parser failure")
+		return
+	}
+	result,err:= query.QueryListReportByPeerId(db,id)
+	if err!=nil{
+		fmt.Print(err)
+		response.Res400(ctx,"query failure")
+		return
+	}
+	db.Close()
+	response.Res200(ctx,"get list success",result)
+ }
 

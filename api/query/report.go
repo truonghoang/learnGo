@@ -13,6 +13,7 @@ type Record struct {
 	FirstName     string `json:"firstName" db:"first_name"`
 	LastName      string `json:"last_name" db:"last_name"`
 	Phone         string `json:"phone" db:"phone"`
+	PeerId        int    `json:"peer_id" db:"peer_id"`
 	TotalReported string `json:"total_reported" db:"total"`
 	Time          string `json:"created_at" db:"created_at"`
 }
@@ -23,6 +24,7 @@ type RecordDetail struct {
 	Phone        string `json:"phone"`
 	TotalLink    int    `json:"totalLink" `
 	TotalAccount int    `json:"totalAccount" `
+	PeerId       int    `json:"peer_id"`
 }
 type CountUserPhone struct {
 	PeerId    int    `json:"id" db:"peer_id"`
@@ -43,6 +45,18 @@ type Response struct {
 	Total int      `json:"totalPage"`
 }
 
+type ResultAccountNumberReport struct {
+	FirstName   string `json:"first_name" db:"first_name"`
+	LastName    string `json:"last_name" db:"last_name"`
+	Phone       string `json:"phone" db:"phone"`
+	TotalReport int    `json:"totalReport" db:"totalReport"`
+}
+
+type LinkStruct struct {
+	Id   int    `json:"id" db:"id"`
+	Link string `json:"link" db:"link"`
+}
+
 func QueryListReport(db *sqlx.DB, page int, limit int, ch chan Response, wg *sync.WaitGroup) {
 	defer wg.Done()
 	offset := (page - 1) * limit
@@ -54,7 +68,7 @@ func QueryListReport(db *sqlx.DB, page int, limit int, ch chan Response, wg *syn
          FROM reports
         GROUP BY peer_id
     )
-    SELECT r.id, u2.first_name, u2.last_name, u2.phone, r.created_at, uc.total
+    SELECT r.id, u2.first_name, u2.last_name, uc.peer_id,u2.phone, r.created_at, uc.total
     FROM (
         SELECT r.*
         FROM reports r
@@ -339,29 +353,51 @@ func CountAccountAndLinkByPhone(db *sqlx.DB, id int) (*CountUserPhone, error) {
 
 }
 
+func QueryListAccountWithAndNumberReport(db *sqlx.DB, phone string) (*[]ResultAccountNumberReport, error) {
 
-func QueryListAccountWithAndNumberReport(db *sqlx.DB,phone string,){
+	result := []ResultAccountNumberReport{}
 	query := `
-	WITH uid_counts AS (
-        SELECT peer_id, COUNT(*) AS total
-         FROM reports
-        GROUP BY peer_id
-    )
-    SELECT r.id, u2.first_name, u2.last_name, u2.phone, r.created_at, uc.total
-    FROM (
-        SELECT r.*
-        FROM reports r
-        WHERE r.peer_id != 0
-        AND (r.id IN (
-            SELECT MAX(id)
-            FROM reports
-            WHERE peer_id != 0
-            GROUP BY peer_id
-        ))
-    ) r
-    JOIN uid_counts uc ON r.peer_id = uc.peer_id
-    JOIN users u1 ON r.user_id = u1.id
-    JOIN users u2 ON r.peer_id = u2.id
+	SELECT  u1.first_name, u1.last_name, u1.phone,COALESCE(COUNT(uc.peer_id), 0) as totalReport
+	FROM users u1 
+	LEFT JOIN reports uc on u1.id=uc.peer_id 
+	Where u1.phone = ?
+	GROUP BY u1.id 
    `
-   fmt.Print(query)
+	err := db.Select(&result, query, phone)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func QueryListLinkByPeerId(db *sqlx.DB, peer_id int) (*[]LinkStruct, error) {
+	result := []LinkStruct{}
+	query := `select un.id,un.link from username un where un.peer_id =? `
+	err := db.Select(&result, query, peer_id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+
+}
+type StructReportPeerId struct {
+	FirstName string `json:"first_name" db:"first_name"`
+	LastName string `json:"last_name" db:"last_name"`
+	Phone string 	`json:"phone" db:"phone"`
+	Reason int `json:"reason" db:"reason"`
+	Content string 	`json:"content" db:"content"`
+	Time string `json:"created_at" db:"created_at"`
+}
+func QueryListReportByPeerId(db *sqlx.DB, peer_id int) (*[]StructReportPeerId, error) {
+	result := []StructReportPeerId{}
+	query := `select u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.peer_id =? `
+	err := db.Select(&result, query, peer_id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+
 }
