@@ -1,8 +1,9 @@
 package routes
 
 import (
+	
 	"truonghoang/go-scam/api/handles"
-	// "truonghoang/go-scam/api/middleware"
+	"truonghoang/go-scam/api/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,14 +22,21 @@ func RouteAccount(route *gin.RouterGroup) {
 }
 
 func RouteUser(route *gin.RouterGroup) {
-	accountGroup := route.Group("/user")
+	accountGroup := route.Group("/user").Use(middleware.MiddleWare())
 	{	// select user
 		accountGroup.GET("/select", func(ctx *gin.Context) {
 			handles.SelectUser(ctx)
 		})
+		
 		//search user by phone
 		accountGroup.GET(("/search"), func(ctx *gin.Context) {
 			handles.GetDetailUser(ctx, true)
+		})
+		accountGroup.GET("/banned",func(ctx *gin.Context) {
+			handles.ListUserBan(ctx)
+		})
+		accountGroup.POST("/banned",func(ctx *gin.Context) {
+			handles.BanAndUnBanUser(ctx)
 		})
 		//detail user
 		accountGroup.GET("/:id", func(ctx *gin.Context) {
@@ -48,22 +56,23 @@ func RouteUserScam(route *gin.RouterGroup) {
 		routeReport.GET("", func(ctx *gin.Context) {
 			handles.ListReport(ctx)
 		})
-
-		routeReport.POST("", func(ctx *gin.Context) {
-			handles.AddReport(ctx)
-		})
 		routeReport.GET("/search",func(ctx *gin.Context) {
 			handles.SearchPhoneReport(ctx)
 		})
 		routeReport.GET("/filter",func(ctx *gin.Context){
 			handles.FilterReportByReason(ctx)
 		})
+		routeReport.POST("/process",func(ctx *gin.Context) {
+			handles.HandleProcessReadReport(ctx)
+		})
+
+		routeReport.GET("/history/:id",func(ctx *gin.Context) {
+			handles.HandleHistoryReport(ctx)
+		})
 		routeReport.GET("/:id", func(ctx *gin.Context) {
 			handles.DetailReport(ctx)
 		})
-		routeReport.DELETE("/:id",func(ctx *gin.Context){
-			handles.DeleteReport(ctx)
-		})
+		
 		routeReport.GET("/detail/account",func(ctx *gin.Context) {
 			handles.GetListAccountByDetail(ctx)
 		})
@@ -72,6 +81,16 @@ func RouteUserScam(route *gin.RouterGroup) {
 		})
 		routeReport.GET("/detail/list",func(ctx *gin.Context) {
 			handles.GetListReportByPeerId(ctx)
+		})
+		routeReport.GET("/detail/:id",func(ctx *gin.Context) {
+			
+			handles.DetailOwnerReport(ctx)
+		})
+		routeReport.DELETE("/:id/:process",func(ctx *gin.Context){
+			handles.HandleAccessOrDenyReport(ctx)
+		})
+		routeReport.GET("/detail/list/filter",func(ctx *gin.Context) {
+			handles.FilterReportBannedByReason(ctx)
 		})
 
 	}

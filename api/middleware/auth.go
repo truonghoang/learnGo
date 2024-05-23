@@ -38,19 +38,25 @@ func VerifyToken(tokenString string) (*CustomClaims, error) {
 
 func MiddleWare() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		tokenString := ctx.GetHeader("Authorization")
-		if tokenString == "" {
+		auth := ctx.GetHeader("Authorization")
+		token :=""
+		if len(auth) > 7 && auth[:7] == "Bearer " {
+			// Trả về token (bỏ phần "Bearer ")
+			token= auth[7:]
+		}
+		if auth == "" {
 			response.Res403(ctx)
 			ctx.Abort()
 			return
 		}
-		decode, err := VerifyToken(tokenString)
+		decode, err := VerifyToken(token)
 		if err != nil {
 			response.Res401(ctx)
 			ctx.Abort()
 			return
 		}
-		ctx.Set("user", decode.Id)
+		ctx.Set("role", decode.Id)
+		ctx.Set("email",decode.Email)
 
 		ctx.Next()
 	}
