@@ -73,8 +73,8 @@ type LinkStruct struct {
 	Link string `json:"link" db:"link"`
 }
 
-type StructReportPeerId struct {
-	Id int `json:"id" db:"id"`
+type ReportPeerIdStruct struct {
+	Id        int    `json:"id" db:"id"`
 	FirstName string `json:"first_name" db:"first_name"`
 	LastName  string `json:"last_name" db:"last_name"`
 	Phone     string `json:"phone" db:"phone"`
@@ -120,7 +120,16 @@ type ResponseFilterOwnerByReason struct {
 	Error bool
 }
 
-func QueryListReport(db *sqlx.DB, page int, limit int, ch chan Response, wg *sync.WaitGroup) {
+type HiddenReport struct {
+	Id      int `json:"id"`
+	Deleted int `json:"deleted"`
+}
+type ProcessReport struct {
+	Id      int `json:"id"`
+	Process int `json:"process"`
+}
+
+func QueryListReport(db *sqlx.DB,orderBy string, page int, limit int, ch chan Response, wg *sync.WaitGroup) {
 	defer wg.Done()
 	offset := (page - 1) * limit
 	var responseData Response
@@ -146,13 +155,13 @@ func QueryListReport(db *sqlx.DB, page int, limit int, ch chan Response, wg *syn
     JOIN uid_counts uc ON r.peer_id = uc.peer_id
     JOIN users u1 ON r.user_id = u1.id
     JOIN users u2 ON r.peer_id = u2.id
-	Order By created_at ASC
-    LIMIT ? OFFSET ?`
+	Order By r.created_at `+ orderBy +
+    ` LIMIT ? OFFSET ?`
 
 	err := db.Select(&dataResult, query, limit, offset)
 
 	if err != nil {
-
+ fmt.Print(err)
 		responseData.Err = true
 		ch <- responseData
 		return
@@ -188,15 +197,6 @@ func QueryListReport(db *sqlx.DB, page int, limit int, ch chan Response, wg *syn
 
 	ch <- responseData
 
-}
-
-type HiddenReport struct {
-	Id      int `json:"id"`
-	Deleted int `json:"deleted"`
-}
-type ProcessReport struct {
-	Id      int `json:"id"`
-	Process int `json:"process"`
 }
 
 func DeleteReport(db *sqlx.DB, id int, deleted int, ch chan bool, wg *sync.WaitGroup) {
@@ -256,7 +256,7 @@ func FilterByTypeReason(db *sqlx.DB, reason int, page int, limit int, ch chan Re
     JOIN uid_counts uc ON r.peer_id = uc.peer_id
     JOIN users u1 ON r.user_id = u1.id
     JOIN users u2 ON r.peer_id = u2.id
-	Where NOT r.peer_id=0 AND r.reason =? 
+	Where NOT r.peer_id=0 AND r.reason =? order by r.id desc
     LIMIT ? OFFSET ?
 	`
 
@@ -298,7 +298,7 @@ func FilterByTypeReason(db *sqlx.DB, reason int, page int, limit int, ch chan Re
 
 }
 
-func SearchReportByPhone(db *sqlx.DB, phone string, limit int, page int, ch chan Response, wg *sync.WaitGroup) {
+func SearchReportByKeySearch(db *sqlx.DB, keySearch string, limit int, page int, ch chan Response, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	offset := (page - 1) * limit
@@ -306,7 +306,7 @@ func SearchReportByPhone(db *sqlx.DB, phone string, limit int, page int, ch chan
 	var responseData Response
 
 	dataResult := make([]Record, limit)
-
+   key:= `%` +keySearch + `%`
 	querySearch := `
 	WITH uid_counts AS (
         SELECT peer_id, COUNT(*) AS total
@@ -316,13 +316,13 @@ func SearchReportByPhone(db *sqlx.DB, phone string, limit int, page int, ch chan
     SELECT r.id, u2.first_name,u2.last_name, u2.phone,r.created_at, uc.total
     FROM reports r
     JOIN uid_counts uc ON r.peer_id = uc.peer_id
-    JOIN users u1 ON r.user_id=u1.id join users u2 on r.peer_id =u2.id
-    Where  u2.phone=? OR u1.phone= ? AND NOT r.peer_id=0  LIMIT ? offset ? `
+    JOIN users u1 ON r.user_id=u1.id join users u2 on r.peer_id =u2.id 
+    Where u2.phone like ? OR u2.first_name like ? OR u2.last_name like ? AND NOT r.peer_id=0 order by r.created_at desc  LIMIT ? offset ? `
 
-	err := db.Select(&dataResult, querySearch, phone, phone, limit, offset)
+	err := db.Select(&dataResult, querySearch, key,key,key, limit, offset)
 
 	if err != nil {
-
+    
 		responseData.Err = true
 		ch <- responseData
 		return
@@ -330,12 +330,12 @@ func SearchReportByPhone(db *sqlx.DB, phone string, limit int, page int, ch chan
 
 	var count float64
 
-	countQuery := `SELECT count(rp.id) as totalPage from reports rp JOIN users u1 ON rp.user_id=u1.id join users u2 on rp.peer_id =u2.id where u1.phone =? or u2.phone=?`
+	countQuery := `SELECT count(rp.id) as totalPage from reports rp JOIN users u1 ON rp.user_id=u1.id join users u2 on rp.peer_id =u2.id  Where  u2.phone like ? OR u2.first_name like ? OR u2.last_name like ?`
 
-	error2 := db.QueryRow(countQuery, phone, phone).Scan(&count)
+	error2 := db.QueryRow(countQuery, key, key,key).Scan(&count)
 
 	if error2 != nil {
-
+		fmt.Print(error2)
 		responseData.Err = true
 		ch <- responseData
 		return
@@ -460,8 +460,8 @@ func QueryListLinkByPeerId(db *sqlx.DB, peer_id int) (*[]LinkStruct, error) {
 
 }
 
-func QueryListReportByPeerId(db *sqlx.DB, peer_id int) (*[]StructReportPeerId, error) {
-	result := []StructReportPeerId{}
+func QueryListReportByPeerId(db *sqlx.DB, peer_id int) (*[]ReportPeerIdStruct, error) {
+	result := []ReportPeerIdStruct{}
 	query := `select r.id, u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.peer_id =? `
 	err := db.Select(&result, query, peer_id)
 	if err != nil {
@@ -469,6 +469,42 @@ func QueryListReportByPeerId(db *sqlx.DB, peer_id int) (*[]StructReportPeerId, e
 	}
 
 	return &result, nil
+
+}
+
+func QueryListReportByReporter(db *sqlx.DB, reporter int, orderBy string) (*[]ReportPeerIdStruct, error) {
+	result := []ReportPeerIdStruct{}
+	query := `select r.id, u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.user_id =? order by created_at ` + orderBy
+	err := db.Select(&result, query, reporter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+
+}
+
+func FilterReportOfReporterByReason(db *sqlx.DB, reason int, reporter int, ch chan ResponseFilterOwnerByReason, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	var responseData ResponseFilterOwnerByReason
+	dataResult := []FilterOwnerByReason{}
+
+	query := `select r.id, u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.user_id =? and r.reason= ? order by created_at DESC `
+
+	err := db.Select(&dataResult, query, reporter, reason)
+
+	if err != nil {
+		fmt.Print("query" + err.Error())
+		responseData.Error = true
+		ch <- responseData
+		return
+	}
+
+	responseData.Error = false
+	responseData.Data = dataResult
+
+	ch <- responseData
 
 }
 
@@ -599,14 +635,14 @@ func FilterOwnerByTypeReason(db *sqlx.DB, reason int, peer_id int, ch chan Respo
 
 }
 
-func DetailOwnerReport(db *sqlx.DB,id int) (*StructReportPeerId,error){
-	result:= StructReportPeerId{}
+func DetailReportByPeerId(db *sqlx.DB, id int) (*ReportPeerIdStruct, error) {
+	result := ReportPeerIdStruct{}
 
-	query :=` select r.id, u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at from reports r join users u on u.id=r.user_id where r.id=? `
+	query := ` select r.id, u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at from reports r join users u on u.id=r.user_id where r.id=? `
 
-	err:= db.Get(&result,query,id)
-	if err!= nil {
-		return nil,err
+	err := db.Get(&result, query, id)
+	if err != nil {
+		return nil, err
 	}
-	return &result,nil
+	return &result, nil
 }

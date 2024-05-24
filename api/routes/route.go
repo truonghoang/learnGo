@@ -50,14 +50,13 @@ func RouteUser(route *gin.RouterGroup) {
 	}
 }
 func RouteUserScam(route *gin.RouterGroup) {
-	routeReport := route.Group("/report")
-	// .Use(middleware.MiddleWare())
+	routeReport := route.Group("/report").Use(middleware.MiddleWare())
 	{
 		routeReport.GET("", func(ctx *gin.Context) {
 			handles.ListReport(ctx)
 		})
 		routeReport.GET("/search",func(ctx *gin.Context) {
-			handles.SearchPhoneReport(ctx)
+			handles.SearchReport(ctx)
 		})
 		routeReport.GET("/filter",func(ctx *gin.Context){
 			handles.FilterReportByReason(ctx)
@@ -76,20 +75,27 @@ func RouteUserScam(route *gin.RouterGroup) {
 		routeReport.GET("/detail/account",func(ctx *gin.Context) {
 			handles.GetListAccountByDetail(ctx)
 		})
-		routeReport.GET("/detail/link",func(ctx *gin.Context) {
+		routeReport.GET("/detail/alias",func(ctx *gin.Context) {
 			handles.GetListLinkByDetail(ctx)
 		})
-		routeReport.GET("/detail/list",func(ctx *gin.Context) {
+		
+		routeReport.GET("/reporter/:id",func(ctx *gin.Context) {
+			handles.HandleListReportByReporter(ctx)
+		})
+		routeReport.GET("/reporter/filter/:id",func(ctx *gin.Context) {
+			handles.FilterReportByReporter(ctx)
+		})
+		routeReport.GET("/reported-user/list",func(ctx *gin.Context) {
 			handles.GetListReportByPeerId(ctx)
 		})
-		routeReport.GET("/detail/:id",func(ctx *gin.Context) {
+		routeReport.GET("/reported-user/:id",func(ctx *gin.Context) {
 			
-			handles.DetailOwnerReport(ctx)
+			handles.HandleDetailReportByPeerId(ctx)
 		})
 		routeReport.DELETE("/:id/:process",func(ctx *gin.Context){
 			handles.HandleAccessOrDenyReport(ctx)
 		})
-		routeReport.GET("/detail/list/filter",func(ctx *gin.Context) {
+		routeReport.GET("/reported-user/list/filter",func(ctx *gin.Context) {
 			handles.FilterReportBannedByReason(ctx)
 		})
 

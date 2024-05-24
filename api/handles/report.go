@@ -33,7 +33,7 @@ type BanPayload struct {
 func ListReport(ctx *gin.Context) {
 	page := ctx.Query("page")
 	limit := ctx.Query("limit")
-
+	orderBy := ctx.Query("sort")
 	parseLimit, err := strconv.Atoi(limit)
 	if parseLimit <= 0 {
 		parseLimit = 1
@@ -64,7 +64,7 @@ func ListReport(ctx *gin.Context) {
 
 	wg.Add(1)
 
-	go query.QueryListReport(db, parsePage, parseLimit, ch_report, &wg)
+	go query.QueryListReport(db,orderBy, parsePage, parseLimit, ch_report, &wg)
 
 	dataResponse := <-ch_report
 	go func() {
@@ -238,11 +238,11 @@ func HandleProcessReadReport(ctx *gin.Context) {
 	response.Res200(ctx, "access successfully", DeleteResponse{Data: true})
 }
 
-func SearchPhoneReport(ctx *gin.Context) {
+func SearchReport(ctx *gin.Context) {
 
 	page := ctx.Query("page")
 	limit := ctx.Query("limit")
-	phone := ctx.Query("phone")
+	search := ctx.Query("keySearch")
 
 	parseLimit, err := strconv.Atoi(limit)
 	if parseLimit <= 0 {
@@ -274,7 +274,7 @@ func SearchPhoneReport(ctx *gin.Context) {
 
 	wg.Add(1)
 
-	go query.SearchReportByPhone(db, phone, parseLimit, parsePage, ch_report, &wg)
+	go query.SearchReportByKeySearch(db, search, parseLimit, parsePage, ch_report, &wg)
 
 	dataResponse := <-ch_report
 
@@ -495,7 +495,7 @@ func FilterReportBannedByReason(ctx *gin.Context) {
 }
 
 
-func DetailOwnerReport(ctx *gin.Context){
+func HandleDetailReportByPeerId(ctx *gin.Context){
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
 		response.Res400(ctx, "parser param error")
@@ -506,10 +506,75 @@ func DetailOwnerReport(ctx *gin.Context){
 		return
 	}
 
-	success,err:= query.DetailOwnerReport(db,id)
+	success,err:= query.DetailReportByPeerId(db,id)
 	if err!=nil {
 		response.Res400(ctx,err.Error())
 		return
 	}
 	response.Res200(ctx,"get history success",success)
+}
+
+
+
+func HandleListReportByReporter(ctx *gin.Context){
+	id, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		response.Res400(ctx, "parser param error")
+	}
+	orderBy := ctx.Query("sort")
+	db, err := connection.ConnectDb()
+	if err != nil {
+		response.Res400(ctx, "connect Db fail")
+		return
+	}
+	success,err:= query.QueryListReportByReporter(db,id,orderBy)
+	if err!=nil {
+		response.Res400(ctx,err.Error())
+		return
+	}
+	response.Res200(ctx,"get list by reporter success",success)
+}
+
+func FilterReportByReporter(ctx *gin.Context) {
+
+	reason := ctx.Query("reason")
+	
+	parserReason, err := strconv.Atoi(reason)
+	if err != nil {
+		response.Res400(ctx, "Invalid reason")
+		return
+	}
+
+    reporter := ctx.Query("id")
+	
+	parserId, err := strconv.Atoi(reporter)
+	if err != nil {
+		response.Res400(ctx, "Invalid reason")
+		return
+	}
+	db, err := connection.ConnectDb()
+	if err != nil {
+		response.Res400(ctx, "connect Db fail")
+		return
+	}
+
+	// query
+	var wg sync.WaitGroup
+	ch_report := make(chan query.ResponseFilterOwnerByReason)
+	wg.Add(1)
+
+	go query.FilterOwnerByTypeReason(db, parserReason,parserId, ch_report, &wg)
+	dataResponse := <-ch_report
+
+	go func() {
+		wg.Wait()
+		close(ch_report)
+		db.Close()
+	}()
+	if dataResponse.Error {
+		response.Res400(ctx, "query db fail")
+		return
+	}
+
+	response.Res200(ctx, "list data", dataResponse)
 }
