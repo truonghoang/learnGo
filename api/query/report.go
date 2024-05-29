@@ -75,6 +75,7 @@ type LinkStruct struct {
 
 type ReportPeerIdStruct struct {
 	Id        int    `json:"id" db:"id"`
+	UserId		int 	`json:"user_id" db:"user_id" `
 	FirstName string `json:"first_name" db:"first_name"`
 	LastName  string `json:"last_name" db:"last_name"`
 	Phone     string `json:"phone" db:"phone"`
@@ -460,9 +461,9 @@ func QueryListLinkByPeerId(db *sqlx.DB, peer_id int) (*[]LinkStruct, error) {
 
 }
 
-func QueryListReportByPeerId(db *sqlx.DB, peer_id int) (*[]ReportPeerIdStruct, error) {
+func QueryListReportByPeerId(db *sqlx.DB, peer_id int,orderBy string) (*[]ReportPeerIdStruct, error) {
 	result := []ReportPeerIdStruct{}
-	query := `select r.id, u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.peer_id =? `
+	query := `select r.id,r.user_id, u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.peer_id =? and r.process=0 and r.deleted=0 order by created_at ` + orderBy
 	err := db.Select(&result, query, peer_id)
 	if err != nil {
 		return nil, err
@@ -474,12 +475,12 @@ func QueryListReportByPeerId(db *sqlx.DB, peer_id int) (*[]ReportPeerIdStruct, e
 
 func QueryListReportByReporter(db *sqlx.DB, reporter int, orderBy string) (*[]ReportPeerIdStruct, error) {
 	result := []ReportPeerIdStruct{}
-	query := `select r.id, u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.user_id =? order by created_at ` + orderBy
+	query := `select r.id,r.user_id, u2.first_name, u2.last_name,u2.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.user_id =? order by created_at ` + orderBy
 	err := db.Select(&result, query, reporter)
 	if err != nil {
 		return nil, err
 	}
-
+	
 	return &result, nil
 
 }
@@ -490,7 +491,7 @@ func FilterReportOfReporterByReason(db *sqlx.DB, reason int, reporter int, ch ch
 	var responseData ResponseFilterOwnerByReason
 	dataResult := []FilterOwnerByReason{}
 
-	query := `select r.id, u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.user_id =? and r.reason= ? order by created_at DESC `
+	query := `select r.id, u2.first_name, u2.last_name,u2.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.user_id =? and r.reason= ? order by created_at DESC `
 
 	err := db.Select(&dataResult, query, reporter, reason)
 

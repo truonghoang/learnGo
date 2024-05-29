@@ -337,12 +337,14 @@ func GetListReportByPeerId(ctx *gin.Context) {
 		response.Res400(ctx, "parser failure")
 		return
 	}
+	orderBy := ctx.Query("sort")
+	
 	db, err := connection.ConnectDb()
 	if err != nil {
-		response.Res400(ctx, "parser failure")
+		response.Res400(ctx, "connect db failure")
 		return
 	}
-	result, err := query.QueryListReportByPeerId(db, id)
+	result, err := query.QueryListReportByPeerId(db, id,orderBy)
 	if err != nil {
 		fmt.Print(err)
 		response.Res400(ctx, "query failure")
@@ -491,7 +493,7 @@ func FilterReportBannedByReason(ctx *gin.Context) {
 		return
 	}
 
-	response.Res200(ctx, "list data", dataResponse)
+	response.Res200(ctx, "list data", dataResponse.Data)
 }
 
 
@@ -545,11 +547,11 @@ func FilterReportByReporter(ctx *gin.Context) {
 		return
 	}
 
-    reporter := ctx.Query("id")
+    reporter := ctx.Param("id")
 	
 	parserId, err := strconv.Atoi(reporter)
 	if err != nil {
-		response.Res400(ctx, "Invalid reason")
+		response.Res400(ctx, err.Error())
 		return
 	}
 	db, err := connection.ConnectDb()
@@ -563,7 +565,7 @@ func FilterReportByReporter(ctx *gin.Context) {
 	ch_report := make(chan query.ResponseFilterOwnerByReason)
 	wg.Add(1)
 
-	go query.FilterOwnerByTypeReason(db, parserReason,parserId, ch_report, &wg)
+	go query.FilterReportOfReporterByReason(db, parserReason,parserId, ch_report, &wg)
 	dataResponse := <-ch_report
 
 	go func() {
@@ -576,5 +578,5 @@ func FilterReportByReporter(ctx *gin.Context) {
 		return
 	}
 
-	response.Res200(ctx, "list data", dataResponse)
+	response.Res200(ctx, "list data", dataResponse.Data)
 }

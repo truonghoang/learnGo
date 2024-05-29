@@ -51,3 +51,13 @@ func Res200(ctx *gin.Context, message string, data interface{}) {
 	})
 
 }
+
+ func Res204(ctx *gin.Context, message string, data interface{}) {
+	ctx.JSON(http.StatusOK, gin.H{
+		"code":     0,
+		"status":   http.StatusOK,
+		"message":  message,
+		"response": data,
+	})
+
+}
