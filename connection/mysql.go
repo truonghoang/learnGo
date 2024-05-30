@@ -20,7 +20,7 @@ func ConnectDb() (*sqlx.DB, error) {
 		return nil, err
 	}
 	dsn := fmt.Sprintf(`%s:%s@tcp(%s:3306)/%s`,cfg.User,cfg.Password,cfg.Host,cfg.DB_Name)
-	// fmt.Print(dsn)
+	
 	db, err := sqlx.Connect("mysql",dsn)
 	if err != nil {
 		return nil, err

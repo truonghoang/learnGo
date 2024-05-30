@@ -1,7 +1,7 @@
 package query
 
 import (
-	"fmt"
+	
 	"math"
 	"sync"
 
@@ -75,7 +75,7 @@ type LinkStruct struct {
 
 type ReportPeerIdStruct struct {
 	Id        int    `json:"id" db:"id"`
-	UserId		int 	`json:"user_id" db:"user_id" `
+	UserId    int    `json:"user_id" db:"user_id" `
 	FirstName string `json:"first_name" db:"first_name"`
 	LastName  string `json:"last_name" db:"last_name"`
 	Phone     string `json:"phone" db:"phone"`
@@ -85,9 +85,9 @@ type ReportPeerIdStruct struct {
 }
 
 type CheckBan struct {
-	Id  int    `db:"id"`
-	Uid string `db:"uid"`
-	Ban int
+	Id  int    `json:"id" db:"id"`
+	Uid string `json:"uid" db:"uid"`
+	Ban int    `json:"ban"`
 }
 type BanUserWithPhone struct {
 	Id int `db:"id"`
@@ -97,19 +97,20 @@ type UidBanned struct {
 	Id int `json:"id" db:"id"`
 }
 type HistoryBan struct {
-	Id       int    `json:"id" db:"id"`
-	Ban      int    `json:"ban" db:"ban"`
-	Reason   int    `json:"reason" db:"reason"`
-	AdminBan string `json:"admin_ban" db:"admin_ban"`
-	Time     string `json:"created_at" db:"created_at"`
+	Id        int    `json:"id" db:"id"`
+	Ban       int    `json:"ban" db:"ban"`
+	Reason    int    `json:"reason" db:"reason"`
+	AdminBan  string `json:"admin_ban" db:"admin_ban"`
+	Time      string `json:"created_at" db:"created_at"`
+	FirstName string `json:"first_name" db:"first_name"`
+	LastName  string `json:"last_name" db:"last_name"`
+	Phone     string `json:"phone" db:"phone"`
 }
-type ResponseHistoryban struct {
-	Data []HistoryBan
-}
+
 
 type FilterOwnerByReason struct {
 	Id        int    `json:"id" db:"id"`
-	FirstName string `json:"firstName" db:"first_name"`
+	FirstName string `json:"first_name" db:"first_name"`
 	LastName  string `json:"last_name" db:"last_name"`
 	Phone     string `json:"phone" db:"phone"`
 	Reason    int    `json:"reason" db:"reason"`
@@ -130,7 +131,7 @@ type ProcessReport struct {
 	Process int `json:"process"`
 }
 
-func QueryListReport(db *sqlx.DB,orderBy string, page int, limit int, ch chan Response, wg *sync.WaitGroup) {
+func QueryListReport(db *sqlx.DB, orderBy string, page int, limit int, ch chan Response, wg *sync.WaitGroup) {
 	defer wg.Done()
 	offset := (page - 1) * limit
 	var responseData Response
@@ -156,13 +157,13 @@ func QueryListReport(db *sqlx.DB,orderBy string, page int, limit int, ch chan Re
     JOIN uid_counts uc ON r.peer_id = uc.peer_id
     JOIN users u1 ON r.user_id = u1.id
     JOIN users u2 ON r.peer_id = u2.id
-	Order By r.created_at `+ orderBy +
-    ` LIMIT ? OFFSET ?`
+	Order By r.created_at ` + orderBy +
+		` LIMIT ? OFFSET ?`
 
 	err := db.Select(&dataResult, query, limit, offset)
 
 	if err != nil {
- fmt.Print(err)
+		
 		responseData.Err = true
 		ch <- responseData
 		return
@@ -275,7 +276,7 @@ func FilterByTypeReason(db *sqlx.DB, reason int, page int, limit int, ch chan Re
 	err := db.Select(&dataResult, query, reason, reason, reason, limit, offset)
 
 	if err != nil {
-		fmt.Print("query" + err.Error())
+	
 		responseData.Err = true
 		ch <- responseData
 		return
@@ -307,7 +308,7 @@ func SearchReportByKeySearch(db *sqlx.DB, keySearch string, limit int, page int,
 	var responseData Response
 
 	dataResult := make([]Record, limit)
-   key:= `%` +keySearch + `%`
+	key := `%` + keySearch + `%`
 	querySearch := `
 	WITH uid_counts AS (
         SELECT peer_id, COUNT(*) AS total
@@ -315,15 +316,25 @@ func SearchReportByKeySearch(db *sqlx.DB, keySearch string, limit int, page int,
         GROUP BY peer_id
     )
     SELECT r.id, u2.first_name,u2.last_name, u2.phone,r.created_at, uc.total
-    FROM reports r
+    FROM  (
+        SELECT r.*
+        FROM reports r
+        WHERE r.peer_id != 0
+        AND (r.id IN (
+            SELECT MAX(id)
+            FROM reports
+            WHERE peer_id != 0 
+            GROUP BY peer_id
+        ))
+    ) r
     JOIN uid_counts uc ON r.peer_id = uc.peer_id
     JOIN users u1 ON r.user_id=u1.id join users u2 on r.peer_id =u2.id 
     Where u2.phone like ? OR u2.first_name like ? OR u2.last_name like ? AND NOT r.peer_id=0 order by r.created_at desc  LIMIT ? offset ? `
 
-	err := db.Select(&dataResult, querySearch, key,key,key, limit, offset)
+	err := db.Select(&dataResult, querySearch, key, key, key, limit, offset)
 
 	if err != nil {
-    
+
 		responseData.Err = true
 		ch <- responseData
 		return
@@ -331,12 +342,22 @@ func SearchReportByKeySearch(db *sqlx.DB, keySearch string, limit int, page int,
 
 	var count float64
 
-	countQuery := `SELECT count(rp.id) as totalPage from reports rp JOIN users u1 ON rp.user_id=u1.id join users u2 on rp.peer_id =u2.id  Where  u2.phone like ? OR u2.first_name like ? OR u2.last_name like ?`
+	countQuery := `SELECT count(rp.id) as totalPage from  (
+        SELECT r.*
+        FROM reports r
+        WHERE r.peer_id != 0
+        AND (r.id IN (
+            SELECT MAX(id)
+            FROM reports
+            WHERE peer_id != 0 
+            GROUP BY peer_id
+        ))
+    ) rp JOIN users u1 ON rp.user_id=u1.id join users u2 on rp.peer_id =u2.id  Where  u2.phone like ? OR u2.first_name like ? OR u2.last_name like ?`
 
-	error2 := db.QueryRow(countQuery, key, key,key).Scan(&count)
+	error2 := db.QueryRow(countQuery, key, key, key).Scan(&count)
 
 	if error2 != nil {
-		fmt.Print(error2)
+		
 		responseData.Err = true
 		ch <- responseData
 		return
@@ -373,7 +394,7 @@ func BasicDetail(db *sqlx.DB, id int, phone string, ch chan Basic, wg *sync.Wait
 	`
 		err := db.Get(&info, queryDB, id)
 		if err != nil {
-			fmt.Print("err not phone:", err)
+		
 			resultDetail.Err = true
 			ch <- resultDetail
 			return
@@ -398,7 +419,7 @@ func BasicDetail(db *sqlx.DB, id int, phone string, ch chan Basic, wg *sync.Wait
 	`
 		err := db.Get(&info, queryDB, id, phone)
 		if err != nil {
-			fmt.Print("err nè:", err)
+		
 			resultDetail.Err = true
 			ch <- resultDetail
 			return
@@ -423,10 +444,10 @@ func CountAccountAndLinkByPhone(db *sqlx.DB, id int) (*CountUserPhone, error) {
 	err := db.Get(&info, queryDB, id)
 
 	if err != nil {
-		fmt.Print("err:", err)
+	
 		return nil, err
 	}
-	fmt.Print(info)
+	
 	return &info, nil
 
 }
@@ -461,7 +482,7 @@ func QueryListLinkByPeerId(db *sqlx.DB, peer_id int) (*[]LinkStruct, error) {
 
 }
 
-func QueryListReportByPeerId(db *sqlx.DB, peer_id int,orderBy string) (*[]ReportPeerIdStruct, error) {
+func QueryListReportByPeerId(db *sqlx.DB, peer_id int, orderBy string) (*[]ReportPeerIdStruct, error) {
 	result := []ReportPeerIdStruct{}
 	query := `select r.id,r.user_id, u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.peer_id =? and r.process=0 and r.deleted=0 order by created_at ` + orderBy
 	err := db.Select(&result, query, peer_id)
@@ -480,7 +501,7 @@ func QueryListReportByReporter(db *sqlx.DB, reporter int, orderBy string) (*[]Re
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &result, nil
 
 }
@@ -496,7 +517,7 @@ func FilterReportOfReporterByReason(db *sqlx.DB, reason int, reporter int, ch ch
 	err := db.Select(&dataResult, query, reporter, reason)
 
 	if err != nil {
-		fmt.Print("query" + err.Error())
+		
 		responseData.Error = true
 		ch <- responseData
 		return
@@ -511,107 +532,7 @@ func FilterReportOfReporterByReason(db *sqlx.DB, reason int, reporter int, ch ch
 
 // Ban user
 
-func InsertBanUserAndHistory(db *sqlx.DB, peer_id int, ban int, reason int, admin_ban string) (int, error) {
 
-	var user CheckBan
-	err := db.Get(&user, "SELECT id, uid FROM ban_user WHERE  uid = ?", peer_id)
-	if err != nil {
-		tx := db.MustBegin()
-		tx.MustExec("INSERT INTO ban_user(uid,ban) VALUES(?,?)", peer_id, ban)
-		tx.MustExec("INSERT INTO ban_history(uid,ban,reason,admin_ban) VALUES(?,?,?,?)", peer_id, ban, reason, admin_ban)
-		if err := tx.Commit(); err != nil {
-			return 0, err
-		}
-		return 1, nil
-	} else {
-		user.Ban = 1
-		_, err := db.NamedExec("UPDATE ban_user SET ban = :ban  WHERE uid = :uid", user)
-		if err != nil {
-			return 0, err
-		}
-		return 1, nil
-	}
-
-}
-
-func BannedOrtherAccountWithPhone(db *sqlx.DB, peer_id int, ban int, phone string, reason int, admin_ban string) (int, error) {
-
-	uid := []UidBanned{}
-	err := db.Select(&uid, "SELECT id FROM users WHERE user_type= -1 AND phone= ?", phone)
-	if err != nil {
-		return 1, nil
-	} else {
-
-		for _, user_id := range uid {
-
-			var user CheckBan
-			err := db.Get(&user, "SELECT id, uid FROM ban_user WHERE  uid = ?", user_id.Id)
-			if err != nil {
-				tx := db.MustBegin()
-				tx.MustExec("INSERT INTO ban_user(uid,ban) VALUES(?,?)", user_id.Id, ban)
-				tx.MustExec("INSERT INTO ban_history(uid,ban,reason,admin_ban) VALUES(?,?,?,?)", user_id.Id, ban, reason, admin_ban)
-				if err := tx.Commit(); err != nil {
-					return 0, err
-
-				}
-				return 1, nil
-			} else {
-				user.Ban = 1
-				_, err := db.NamedExec("UPDATE ban_user SET ban = :ban  WHERE uid = :uid", user)
-				if err != nil {
-					return 0, err
-
-				}
-				return 1, nil
-			}
-
-		}
-
-		return 1, nil
-	}
-
-}
-func ListUserBanned(db *sqlx.DB, page int, limit int, orderBy string, ban int) (*ResponseUserBan, error) {
-	offset := (page - 1) * limit
-	var responseUser ResponseUserBan
-	usersBan := []UserBanned{}
-	query := `SELECT u.first_name,ub.uid ,u.last_name ,u.phone,ub.created_at ,ub.ban from ban_user ub join users u on ub.uid = u.id where ub.ban= ? ORDER BY ub.created_at ` + orderBy + ` limit ? offset ?`
-
-	countQuery := `SELECT count(ub.id) as totalPage from ban_user ub  where ub.ban= ? `
-	err := db.Select(&usersBan, query, ban, limit, offset)
-
-	if err != nil {
-		fmt.Print("query" + err.Error())
-		return nil, err
-	}
-	var count float64
-	error2 := db.QueryRow(countQuery, ban).Scan(&count)
-	if error2 != nil {
-		return nil, error2
-	}
-	responseUser.Data = usersBan
-	responseUser.Limit = limit
-	responseUser.Page = page
-	responseUser.TotalPage = int(count)
-	return &responseUser, nil
-
-}
-
-func GetHistoryBan(db *sqlx.DB, id int) (*ResponseHistoryban, error) {
-	var responseBan ResponseHistoryban
-	result := responseBan.Data
-
-	query := `select id,ban,reason,admin_ban,created_at from ban_history where uid=?`
-
-	err := db.Select(&result, query, id)
-	if err != nil {
-
-		return nil, err
-	}
-	responseBan.Data = result
-
-	return &responseBan, nil
-}
 
 func FilterOwnerByTypeReason(db *sqlx.DB, reason int, peer_id int, ch chan ResponseFilterOwnerByReason, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -623,7 +544,7 @@ func FilterOwnerByTypeReason(db *sqlx.DB, reason int, peer_id int, ch chan Respo
 	err := db.Select(&dataResult, query, reason, peer_id)
 
 	if err != nil {
-		fmt.Print("query" + err.Error())
+	
 		responseData.Error = true
 		ch <- responseData
 		return

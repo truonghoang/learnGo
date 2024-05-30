@@ -1,7 +1,6 @@
 package handles
 
 import (
-	"fmt"
 	"os"
 	"regexp"
 	"strconv"
@@ -47,77 +46,7 @@ type ResponseData struct {
 	Token string `json:"token"`
 }
 
-func Register(ctx *gin.Context) {
-	var account RegisterUser
-	// connect db
-	db, err := connection.ConnectDb()
-	if err != nil {
-		response.Res400(ctx, err.Error())
-		return
-	}
-	// bind json data from payload
-	if err := ctx.BindJSON(&account); err != nil {
-		response.Res400(ctx, err.Error())
-		return
-	}
-	// hash password
-	hashPassword, err := bcrypt.GenerateFromPassword([]byte(account.Password), 10)
-	if err != nil {
-		response.Res400(ctx, err.Error())
-	}
 
-	//insert db
-	var wg sync.WaitGroup
-	ch_user := make(chan bool)
-
-	wg.Add(1)
-
-	go query.InsertUser(db, account.Phone, account.FirstName, account.LastName, string(hashPassword), ch_user, &wg)
-
-	success := <-ch_user
-
-	if !success {
-		response.Res400(ctx, "add user failure")
-		return
-	}
-
-	//start query get id user added by phone
-
-	ch_id := make(chan int)
-
-	wg.Add(1)
-
-	go query.SelectUserId(db, account.Phone, ch_id, &wg)
-
-	id_user := <-ch_id
-
-	if id_user == 0 {
-		response.Res400(ctx, "user not exist")
-		return
-	}
-
-	// start insert user_name
-
-	wg.Add(1)
-
-	go query.InsertUserName(db, id_user, account.Email, ch_user, &wg)
-
-	end := <-ch_user
-
-	if !end {
-		response.Res400(ctx, "insert into user_name failure")
-		return
-	}
-	go func() {
-		wg.Wait()
-		close(ch_user)
-		close(ch_id)
-		db.Close()
-	}()
-
-	response.Res201(ctx, "register success")
-
-}
 
 func Login(ctx *gin.Context) {
 	var account LoginUser
@@ -174,7 +103,7 @@ func Login(ctx *gin.Context) {
 		Id:    userSystem.Role,
 		Email: userSystem.Account,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(15 * time.Minute).Unix(),
+			ExpiresAt: time.Now().Add(55 * time.Minute).Unix(),
 			IssuedAt:  time.Now().Unix(),
 		},
 	}
@@ -193,115 +122,190 @@ func Login(ctx *gin.Context) {
 
 }
 
-func GetDetailUser(ctx *gin.Context, search bool) {
+func SearchBannedUser(ctx *gin.Context){
+	page := ctx.Query("page")
+	limit := ctx.Query("limit")
+	sort := ctx.Query("sort")
+	ban := ctx.Query("ban")
+	keySearch := ctx.Query("keySearch")
+	parseBan, err := strconv.Atoi(ban)
+	if err != nil {
+		response.Res400(ctx, "Invalid ban")
+		return
+	}
+	parseLimit, err := strconv.Atoi(limit)
+	if parseLimit <= 0 {
+		parseLimit = 1
+	}
+	if err != nil {
+		response.Res400(ctx, "Invalid limit")
+		return
+	}
+	parsePage, err := strconv.Atoi(page)
+
+	if parsePage <= 0 {
+		parsePage = 1
+	}
+	if err != nil {
+		response.Res400(ctx, "Invalid page")
+		return
+	}
+
+	db, err := connection.ConnectDb()
+	if err != nil {
+		response.Res400(ctx, "connect Db fail")
+		return
+	}
+
+	result, err := query.QuerySearchUser(db, parsePage, parseLimit, sort, parseBan,keySearch)
+
+	if err != nil {
+		response.Res400(ctx, err.Error())
+		return
+	}
+
+	response.Res200(ctx, "get list user banned successfully", result)
+}
+
+func BanAndUnBanUser(ctx *gin.Context) {
+	var reportInfo BanPayload
 	db, err := connection.ConnectDb()
 	if err != nil {
 		response.Res400(ctx, "err db:"+err.Error())
 		return
 	}
-
-	var wg sync.WaitGroup
-
-	ch_detail := make(chan query.ResultUserInfo)
-
-	wg.Add(1)
-	if search {
-		phone := ctx.Query("phone")
-		go query.QueryUserByPhone(db, phone, ch_detail, &wg)
-	} else {
-		id, err := strconv.Atoi(ctx.Param("id"))
-
-		if err != nil {
-			response.Res400(ctx, "parse id failure")
-			return
-		}
-		go query.QueryUserById(db, id, ch_detail, &wg)
-	}
-
-	detail := <-ch_detail
-	go func() {
-		wg.Wait()
-		close(ch_detail)
-		db.Close()
-	}()
-
-	if detail.Error {
-		response.Res400(ctx, "get user  failure")
+	if err := ctx.BindJSON(&reportInfo); err != nil {
+		response.Res400(ctx, "err bind:"+err.Error())
 		return
 	}
 
-	response.Res200(ctx, "get user success", detail.User)
+	admin := ctx.MustGet("email").(string)
+
+	reportInfo.AdminBan = admin
+	
+	success, err := query.InsertBanUserAndHistory(db, reportInfo.PeerId, reportInfo.Ban, reportInfo.Reason, reportInfo.AdminBan)
+
+	if err != nil && success == 0 {
+		response.Res400(ctx, err.Error())
+		return
+	}
+	result, err := query.BannedOrtherAccountWithPhone(db, reportInfo.PeerId, reportInfo.Ban, reportInfo.Phone, reportInfo.Reason, reportInfo.AdminBan)
+
+	if err != nil && result == 0 {
+		response.Res400(ctx, "Query db fail")
+		return
+	}
+	response.Res201(ctx, "Ban successfully")
 
 }
 
-func ListUser(ctx *gin.Context) {
+func ListUserBan(ctx *gin.Context) {
+	page := ctx.Query("page")
+	limit := ctx.Query("limit")
+	sort := ctx.Query("sort")
+	ban := ctx.Query("ban")
+	parseBan, err := strconv.Atoi(ban)
+	if err != nil {
+		response.Res400(ctx, "Invalid ban")
+		return
+	}
+	parseLimit, err := strconv.Atoi(limit)
+	if parseLimit <= 0 {
+		parseLimit = 1
+	}
+	if err != nil {
+		response.Res400(ctx, "Invalid limit")
+		return
+	}
+	parsePage, err := strconv.Atoi(page)
+
+	if parsePage <= 0 {
+		parsePage = 1
+	}
+	if err != nil {
+		response.Res400(ctx, "Invalid page")
+		return
+	}
+
 	db, err := connection.ConnectDb()
+	if err != nil {
+		response.Res400(ctx, "connect Db fail")
+		return
+	}
+
+	result, err := query.ListUserBanned(db, parsePage, parseLimit, sort, parseBan)
 
 	if err != nil {
-		response.Res400(ctx, "connect db failure")
+		response.Res400(ctx, "query failure")
 		return
 	}
-	ch_list_user := make(chan query.ResponseListUser)
-	var wg sync.WaitGroup
-	parsePage, err := strconv.Atoi(ctx.Query("page"))
-	if err != nil {
-		response.Res400(ctx, "parser page err")
-		return
-	}
-	parseLimit, err := strconv.Atoi(ctx.Query("limit"))
-	if err != nil {
-		response.Res400(ctx, "parser limit err")
-		return
-	}
-	ch_total := make(chan int)
-	wg.Add(2)
-	go query.CountListUser(db, parseLimit, ch_total, &wg)
-	go query.ListUser(db, parseLimit, parsePage, ch_list_user, &wg)
 
-	resultQuery := <-ch_list_user
-	resultTotal := <-ch_total
-	if resultTotal == 0 {
-		response.Res400(ctx, "count record fail")
-		return
-	}
-	resultQuery.Total = resultTotal
-	if resultQuery.Err {
-		response.Res400(ctx, "query data failure")
-		return
-	}
-	fmt.Print(resultQuery)
-	go func() {
-		wg.Wait()
-		close(ch_list_user)
-		db.Close()
-	}()
+	response.Res200(ctx, "get list user banned successfully", result)
 
-	response.Res200(ctx, "list user successfully", resultQuery)
 }
 
-func SelectUser(ctx *gin.Context) {
-	db, err := connection.ConnectDb()
+func HandleHistoryReport(ctx *gin.Context){
 
+	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
-		response.Res400(ctx, "connect db failure")
+		response.Res400(ctx, "parser param error")
+	}
+	db, err := connection.ConnectDb()
+	if err != nil {
+		response.Res400(ctx, "connect Db fail")
 		return
 	}
-	ch_sel_user := make(chan query.ResponseUserName)
+
+	success,err:= query.GetHistoryBan(db,id)
+	if err!=nil {
+		response.Res400(ctx,err.Error())
+		return
+	}
+	response.Res200(ctx,"get history success",success.Data)
+
+}
+
+
+func FilterReportBannedByReason(ctx *gin.Context) {
+
+	reason := ctx.Query("reason")
+	
+	parserReason, err := strconv.Atoi(reason)
+	if err != nil {
+		response.Res400(ctx, "Invalid reason")
+		return
+	}
+
+ peer_id := ctx.Query("id")
+	
+	parserId, err := strconv.Atoi(peer_id)
+	if err != nil {
+		response.Res400(ctx, "Invalid reason")
+		return
+	}
+	db, err := connection.ConnectDb()
+	if err != nil {
+		response.Res400(ctx, "connect Db fail")
+		return
+	}
+
+	// query
 	var wg sync.WaitGroup
+	ch_report := make(chan query.ResponseFilterOwnerByReason)
 	wg.Add(1)
 
-	go query.ListUserSelect(db, ch_sel_user, &wg)
+	go query.FilterOwnerByTypeReason(db, parserReason,parserId, ch_report, &wg)
+	dataResponse := <-ch_report
 
-	resultQuery := <-ch_sel_user
-	if resultQuery.Err {
-		response.Res400(ctx, "query data failure")
-		return
-	}
 	go func() {
 		wg.Wait()
-		close(ch_sel_user)
+		close(ch_report)
 		db.Close()
 	}()
+	if dataResponse.Error {
+		response.Res400(ctx, "query db fail")
+		return
+	}
 
-	response.Res200(ctx, "list user successfully", resultQuery.Data)
+	response.Res200(ctx, "list data", dataResponse.Data)
 }
