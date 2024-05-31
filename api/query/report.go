@@ -539,7 +539,7 @@ func FilterOwnerByTypeReason(db *sqlx.DB, reason int, peer_id int, ch chan Respo
 
 	var responseData ResponseFilterOwnerByReason
 	dataResult := []FilterOwnerByReason{}
-	query := `select u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.reason=? and r.peer_id =? `
+	query := `select u.first_name, u.last_name,u.phone,r.reason ,r.content,r.created_at  from reports r join users u on u.id= r.user_id join users u2 on u2.id =r.peer_id where r.reason=? and r.peer_id =? order by r.created_at desc `
 
 	err := db.Select(&dataResult, query, reason, peer_id)
 

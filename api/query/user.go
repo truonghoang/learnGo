@@ -205,7 +205,9 @@ func InsertBanUserAndHistory(db *sqlx.DB, peer_id int, ban int, reason int, admi
 }
 
 func BannedOrtherAccountWithPhone(db *sqlx.DB, peer_id int, ban int, phone string, reason int, admin_ban string) (int, error) {
-
+	if phone ==""{
+		return 1,nil
+	}
 	uid := []UidBanned{}
 	err := db.Select(&uid, "SELECT id FROM users WHERE user_type!= 9 AND phone= ?", phone)
 	if err != nil {
